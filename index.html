@@ -87,8 +87,21 @@ td.m{font-family:var(--mono)}
 .resbox{display:flex;flex-direction:column;gap:8px;flex:1;min-height:0}
 .lst{flex:1;min-height:0;overflow:auto;border:1px solid var(--line);border-radius:8px}
 .lst thead th{position:sticky;top:0;background:var(--panel)}
-.lst td,.lst th{padding:5px 8px;font-size:12.5px}
+.lst td,.lst th{padding:4px 8px;font-size:12.5px;vertical-align:middle}
+.lst td.m{white-space:nowrap;direction:ltr;text-align:right}
+.lst td.st{font-size:11.5px;line-height:1.4}
 .save{padding-top:4px}
+.legend{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:1px 8px 1px 6px;font-size:11px;background:var(--panel)}
+.chip i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.gh td{background:var(--bg);font-weight:700;font-size:12.5px;padding:6px 8px}
+.gh .gi{display:inline-block;width:11px;height:11px;border-radius:50%;vertical-align:-1px;margin-inline-end:6px}
+.lst tr.row{cursor:pointer}
+.lst tr.row:hover{background:var(--parcel)}
+.lst tr.row.sel{background:var(--parcel);outline:2px solid var(--accent);outline-offset:-2px}
+.no{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:24px;border-radius:50%;font-family:var(--mono);font-size:12px;font-weight:700;color:#fff;padding:0 4px}
+.no.off{background:transparent!important;border:2px solid currentColor}
+
 .stats{grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px}
 .stat{padding:6px 10px}.stat b{font-size:17px}
 @media (max-width:900px){.grid2{grid-template-columns:minmax(0,1fr)}.mapp{height:70vh}.listp{height:auto;max-height:520px}}
@@ -115,6 +128,7 @@ td.m{font-family:var(--mono)}
         <label><input type="checkbox" data-k="base" checked><i class="sw" style="background:var(--draw)"></i>خطوط</label>
         <label><input type="checkbox" data-k="parcel" checked><i class="sw" style="background:var(--parcel);outline:1px solid var(--line)"></i>پارسل</label>
         <label><input type="checkbox" data-k="ax" checked><i class="sw" style="background:var(--axis)"></i>آکس</label>
+        <label><input type="checkbox" data-k="no" checked><i class="sw" style="background:var(--muted)"></i>شماره</label>
         <label><input type="checkbox" data-k="unc" checked><i class="sw" style="background:var(--unc)"></i>مشکوک</label>
         <label><input type="checkbox" data-k="cut" checked><i class="sw" style="background:var(--cut)"></i>پخ</label>
         <label><input type="checkbox" data-k="curb" checked><i class="sw" style="background:var(--curb)"></i>جدول</label>
@@ -134,8 +148,9 @@ td.m{font-family:var(--mono)}
     <h2>معابر شناسایی‌شده</h2>
     <div class="hint" id="emptyL">پس از بارگذاری فایل، فهرست معابر اینجا نمایش داده می‌شود.</div>
     <div id="res" class="resbox" hidden>
-      <div class="hint">معابر مشکوک (نارنجی) پیش‌فرض وارد خروجی نمی‌شوند. با تیک زدن آن‌ها را اضافه یا هر معبر دیگری را حذف کنید.</div>
-      <div class="tbl lst"><table><thead><tr><th>خروجی</th><th>عرض</th><th>طول</th><th>وضعیت</th></tr></thead><tbody id="tb"></tbody></table></div>
+      <div class="hint">معابر مشکوک (نارنجی) پیش‌فرض وارد خروجی نمی‌شوند. با تیک زدن آن‌ها را اضافه یا هر معبر دیگری را حذف کنید. کلیک روی معبر در نقشه = انتخاب؛ دابل‌کلیک = افزودن/حذف. با هر تغییر، انتهای آکس‌ها، پخ قطعات و جدول پیاده‌رو فقط بر اساس معابر تأییدشده دوباره ساخته می‌شود.</div>
+      <div class="legend" id="legend"></div>
+      <div class="tbl lst" id="lst"><table><thead><tr><th>خروجی</th><th>شماره</th><th>طول</th><th>وضعیت</th></tr></thead><tbody id="tb"></tbody></table></div>
       <div class="save">
         <div class="row"><button id="dlZip" class="primary" type="button">ذخیره DXF (فایل zip)</button><button id="dlTxt" type="button">ذخیره به‌صورت txt</button></div>
         <p class="hint" id="dlmsg" style="margin:6px 0 0">سیستم ذخیره فقط پسوندهای مجاز را می‌پذیرد. فایل zip را باز کنید تا DXF را بگیرید. در حالت txt، پسوند را به dxf تغییر دهید.</p>
@@ -576,29 +591,6 @@ td.m{font-family:var(--mono)}
       }
       const orig = A.map(a => Object.assign({}, a));
       const pointOn = (a, t) => PT([a.ux, a.uy], a.c, t);
-      for (let i = 0; i < A.length; i++) {
-        const a = A[i];
-        for (const dir of [1, -1]) {
-          const tEnd = dir > 0 ? a.t1 : a.t0;
-          let best = null;
-          for (let j = 0; j < orig.length; j++) {
-            if (j === i) continue;
-            const b = orig[j];
-            if (Math.abs(cross(a.ux, a.uy, b.ux, b.uy)) < 0.05) continue;
-            // intersection of infinite lines in t of a
-            const p = [0, 0].map((_, k) => pointOn(a, 0)[k]), q = pointOn(b, 0);
-            const r = lineLine(p, [a.ux, a.uy], q, [b.ux, b.uy]);
-            if (!r) continue;
-            const ta = r.t, tb = r.s;
-            if (tb < b.t0 - 1 || tb > b.t1 + 1) continue;
-            const dist = (ta - tEnd) * dir;
-            if (dist < -0.5 || dist > o.maxW) continue;
-            if (ta >= a.t0 && ta <= a.t1 && dist < -0.5) continue;
-            if (!best || dist < best.dist) best = { dist, ta };
-          }
-          if (best) { if (dir > 0) a.t1 = Math.max(a.t1, best.ta); else a.t0 = Math.min(a.t0, best.ta); }
-        }
-      }
       axes = A.filter(a => a.t1 - a.t0 > 1).map((a, i) => {
         const p = pointOn(a, a.t0), q = pointOn(a, a.t1);
         return { id: i, ux: a.ux, uy: a.uy, c: a.c, t0: a.t0, t1: a.t1, w: a.w, p, q, len: a.t1 - a.t0 };
@@ -626,11 +618,33 @@ td.m{font-family:var(--mono)}
       return Object.assign(a, { w, id, cert, reasons, on });
     });
     axes = axesAll.filter(a => a.on);
+    // 7a'. street ends are joined to the CONFIRMED streets only, so removing/adding a street reshapes its neighbours
+    {
+      const orig = axes.map(a => Object.assign({}, a));
+      axes.forEach((a, i) => {
+        for (const dir of [1, -1]) {
+          const tEnd = dir > 0 ? a.t1 : a.t0;
+          let best = null;
+          for (let j = 0; j < orig.length; j++) {
+            if (j === i) continue;
+            const b = orig[j];
+            if (Math.abs(cross(a.ux, a.uy, b.ux, b.uy)) < 0.05) continue;
+            const r = lineLine(PTa(a, 0), [a.ux, a.uy], PTa(b, 0), [b.ux, b.uy]);
+            if (!r) continue;
+            const ta = r.t, tb = r.s;
+            if (tb < b.t0 - 1 || tb > b.t1 + 1) continue;
+            const dist = (ta - tEnd) * dir;
+            if (dist < -0.5 || dist > o.maxW) continue;
+            if (!best || dist < best.dist) best = { dist, ta };
+          }
+          if (best) { if (dir > 0) a.t1 = Math.max(a.t1, best.ta); else a.t0 = Math.min(a.t0, best.ta); }
+        }
+      });
+      axes.forEach(a => { a.p = PTa(a, a.t0); a.q = PTa(a, a.t1); a.len = a.t1 - a.t0; });
+    }
     const edgeW = e => {
       const mx = (e.ax + e.bx) / 2, my = (e.ay + e.by) / 2; let best = null;
-      for (const a of axesAll) {
-        // uncertain streets still give a width to their neighbouring parcels when the width is standard
-        if (!a.on && !(a.w >= 6 && Math.abs(a.w - Math.round(a.w / 2) * 2) < 0.01)) continue;
+      for (const a of axes) {
         if (Math.abs(cross(e.ux, e.uy, a.ux, a.uy)) > 0.05) continue;
         const d = Math.abs(-a.uy * (mx - OXc) + a.ux * (my - OYc) - a.c);
         const t = a.ux * (mx - OXc) + a.uy * (my - OYc);
@@ -870,9 +884,9 @@ td.m{font-family:var(--mono)}
 (function(){
 'use strict';
 var $=function(id){return document.getElementById(id)};
-var state={parsed:null,name:'',res:null,sel:{},axisOn:{}};
+var state={parsed:null,name:'',res:null,sel:{},axisOn:{},selId:null,hoverId:null};
 var view={x:0,y:0,s:1,bbox:null};
-var show={unc:true,curb:true,base:true,parcel:true,ax:true,cut:true,txt:true};
+var show={no:true,unc:true,curb:true,base:true,parcel:true,ax:true,cut:true,txt:true};
 
 function setRes(v){$('res').hidden=!v;$('emptyL').hidden=v}
 function setMsgs(list){var m=$('msgs');m.innerHTML='';list.forEach(function(t){var d=document.createElement('div');d.className='msg'+(t.err?' err':'');d.textContent=t.t;m.appendChild(d)})}
@@ -912,6 +926,13 @@ function fitView(){
   view.y=(b[1]+b[3])/2+(H/2)/view.s;
   draw();
 }
+function palette(R){
+  var dark=(function(){var c=css('--bg').replace('#','');if(c.length===3)c=c[0]+c[0]+c[1]+c[1]+c[2]+c[2];var v=parseInt(c,16);return ((v>>16&255)*.3+(v>>8&255)*.59+(v&255)*.11)<110})();
+  var L=['#2563eb','#059669','#d97706','#dc2626','#7c3aed','#0891b2','#be185d','#65a30d','#475569'];
+  var D=['#60a5fa','#34d399','#fbbf24','#f87171','#a78bfa','#22d3ee','#f472b6','#a3e635','#cbd5e1'];
+  var ws=[];R.axesAll.forEach(function(a){var k=TAF.fmt(a.w);if(ws.indexOf(k)<0)ws.push(k)});
+  ws.sort(function(a,b){return a-b});var m={};ws.forEach(function(k,i){m[k]=(dark?D:L)[i%L.length]});return m;
+}
 function css(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()}
 function draw(){
   var cvs=$('canvas'),box=$('cv'),dpr=window.devicePixelRatio||1;
@@ -934,15 +955,23 @@ function draw(){
     g.strokeStyle=css('--cut');g.lineWidth=2;g.beginPath();
     R.tris.forEach(function(t){g.moveTo(X(t.p1[0]),Y(t.p1[1]));g.lineTo(X(t.p2[0]),Y(t.p2[1]))});g.stroke();
   }
-  if(R&&show.unc&&R.axesAll){
-    g.strokeStyle=css('--unc');g.lineWidth=2;g.setLineDash([5,4]);g.beginPath();
-    R.axesAll.forEach(function(a){if(!a.on){g.moveTo(X(a.p[0]),Y(a.p[1]));g.lineTo(X(a.q[0]),Y(a.q[1]))}});g.stroke();g.setLineDash([]);
-    g.fillStyle=css('--unc');g.font='600 11px ui-monospace,Consolas,monospace';g.textAlign='center';g.textBaseline='bottom';
-    R.axesAll.forEach(function(a){if(!a.on)g.fillText('?'+TAF.fmt(a.w),X((a.p[0]+a.q[0])/2),Y((a.p[1]+a.q[1])/2)-3)});
-  }
-  if(R&&show.ax){
-    g.strokeStyle=css('--axis');g.lineWidth=1.4;g.setLineDash([9,3,2,3]);g.beginPath();
-    R.axes.forEach(function(a){g.moveTo(X(a.p[0]),Y(a.p[1]));g.lineTo(X(a.q[0]),Y(a.q[1]))});g.stroke();g.setLineDash([]);
+  if(R&&R.axesAll&&(show.ax||show.unc)){
+    var pal=palette(R);
+    var vis=R.axesAll.filter(function(a){return a.on?show.ax:show.unc});
+    vis.forEach(function(a){
+      var col=pal[TAF.fmt(a.w)]||'#888',hot=(a.id===state.selId||a.id===state.hoverId);
+      if(hot){g.strokeStyle=col;g.globalAlpha=.28;g.lineWidth=14;g.lineCap='round';g.beginPath();g.moveTo(X(a.p[0]),Y(a.p[1]));g.lineTo(X(a.q[0]),Y(a.q[1]));g.stroke();g.globalAlpha=1;g.lineCap='butt'}
+      g.strokeStyle=col;g.lineWidth=hot?3.5:(a.on?2.2:1.8);g.setLineDash(a.on?[10,3,2,3]:[5,4]);
+      g.beginPath();g.moveTo(X(a.p[0]),Y(a.p[1]));g.lineTo(X(a.q[0]),Y(a.q[1]));g.stroke();g.setLineDash([]);
+    });
+    if(show.no){
+      g.textAlign='center';g.textBaseline='middle';g.font='700 11px ui-monospace,Consolas,monospace';
+      vis.forEach(function(a){
+        var col=pal[TAF.fmt(a.w)]||'#888',cx=X((a.p[0]+a.q[0])/2),cy=Y((a.p[1]+a.q[1])/2),hot=(a.id===state.selId||a.id===state.hoverId);
+        g.beginPath();g.arc(cx,cy,hot?12:10,0,6.2832);g.fillStyle=a.on?col:css('--panel');g.fill();g.lineWidth=2;g.strokeStyle=col;g.stroke();
+        g.fillStyle=a.on?'#fff':col;g.fillText(String(a.no),cx,cy+.5);
+      });
+    }
   }
   if(R&&show.curb&&R.curbs){
     g.strokeStyle=css('--curb');g.lineWidth=1.3;g.beginPath();
@@ -966,7 +995,27 @@ function draw(){
     $('coord').textContent=((e.clientX-r.left)/view.s+view.x).toFixed(2)+' , '+(view.y-(e.clientY-r.top)/view.s).toFixed(2);
     if(!drag)return;view.x=drag.vx-(e.clientX-drag.x)/view.s;view.y=drag.vy+(e.clientY-drag.y)/view.s;draw();
   });
-  cvs.addEventListener('pointerup',function(){drag=null});
+  var down=null;
+  function hit(e){
+    var R=state.res;if(!R||!R.axesAll)return null;
+    var r=cvs.getBoundingClientRect(),px=e.clientX-r.left,py=e.clientY-r.top,best=null;
+    R.axesAll.forEach(function(a){
+      if(a.on?!show.ax:!show.unc)return;
+      var x1=(a.p[0]-view.x)*view.s,y1=(view.y-a.p[1])*view.s,x2=(a.q[0]-view.x)*view.s,y2=(view.y-a.q[1])*view.s;
+      var dx=x2-x1,dy=y2-y1,l2=dx*dx+dy*dy,t=l2?Math.max(0,Math.min(1,((px-x1)*dx+(py-y1)*dy)/l2)):0;
+      var d=Math.hypot(px-x1-t*dx,py-y1-t*dy);
+      if(d<10&&(!best||d<best.d))best={d:d,a:a};
+    });
+    return best&&best.a;
+  }
+  cvs.addEventListener('pointerdown',function(e){down={x:e.clientX,y:e.clientY}});
+  cvs.addEventListener('pointerup',function(e){
+    drag=null;
+    if(down&&Math.hypot(e.clientX-down.x,e.clientY-down.y)<4){var a=hit(e);state.selId=a?a.id:null;draw();markSel(true)}
+    down=null;
+  });
+  cvs.addEventListener('dblclick',function(e){var a=hit(e);if(a){state.axisOn[a.id]=!a.on;state.selId=a.id;run()}});
+  cvs.addEventListener('pointermove',function(e){if(drag)return;var a=hit(e),id=a?a.id:null;cvs.style.cursor=a?'pointer':'';if(id!==state.hoverId){state.hoverId=id;draw()}});
   function zoomAt(f,cx,cy){var wx=cx/view.s+view.x,wy=view.y-cy/view.s;view.s*=f;view.x=wx-cx/view.s;view.y=wy+cy/view.s;draw()}
   cvs.addEventListener('wheel',function(e){e.preventDefault();var r=cvs.getBoundingClientRect();zoomAt(e.deltaY<0?1.2:1/1.2,e.clientX-r.left,e.clientY-r.top)},{passive:false});
   $('zi').onclick=function(){zoomAt(1.4,$('cv').clientWidth/2,$('cv').clientHeight/2)};
@@ -1000,7 +1049,49 @@ function run(){
     $('busy').classList.remove('on');$('runBtn').disabled=false;draw();
   },30);
 }
+function numberAxes(R){
+  var xy=function(a){var p=a.id.split(',');return [+p[0],+p[1]]};
+  var s=R.axesAll.slice().sort(function(a,b){return (a.w-b.w)||(xy(a)[0]-xy(b)[0])||(xy(a)[1]-xy(b)[1])});
+  s.forEach(function(a,i){a.no=i+1});
+}
+function renderList(R){
+  var box=$('lst'),keep=box.scrollTop;
+  var pal=palette(R);
+  var lg=$('legend');lg.innerHTML='';
+  var tb=$('tb');tb.innerHTML='';
+  var groups={};R.axesAll.forEach(function(a){var k=TAF.fmt(a.w);(groups[k]=groups[k]||[]).push(a)});
+  Object.keys(groups).sort(function(a,b){return a-b}).forEach(function(k){
+    var arr=groups[k].sort(function(a,b){return a.no-b.no}),col=pal[k];
+    var onN=arr.filter(function(a){return a.on}).length;
+    var c=document.createElement('span');c.className='chip';c.innerHTML='<i style="background:'+col+'"></i>'+k+' متر · '+arr.length;lg.appendChild(c);
+    var h=document.createElement('tr');h.className='gh';
+    var hc=document.createElement('td');hc.colSpan=4;
+    var gk=document.createElement('input');gk.type='checkbox';gk.checked=onN===arr.length;gk.indeterminate=onN>0&&onN<arr.length;gk.setAttribute('aria-label','همهٔ معابر '+k+' متری');gk.style.marginInlineEnd='8px';
+    gk.addEventListener('change',function(){arr.forEach(function(a){state.axisOn[a.id]=gk.checked});run()});
+    hc.appendChild(gk);var gi=document.createElement('i');gi.className='gi';gi.style.background=col;hc.appendChild(gi);
+    hc.appendChild(document.createTextNode('عرض '+k+' متر — '+arr.length+' معبر'+(onN<arr.length?' ('+onN+' در خروجی)':'')));
+    h.appendChild(hc);tb.appendChild(h);
+    arr.forEach(function(a){
+      var tr=document.createElement('tr');tr.className='row'+(a.id===state.selId?' sel':'');tr.dataset.id=a.id;
+      var c1=document.createElement('td');var k1=document.createElement('input');k1.type='checkbox';k1.checked=a.on;k1.setAttribute('aria-label','معبر '+a.no);
+      k1.addEventListener('click',function(e){e.stopPropagation()});
+      k1.addEventListener('change',function(){state.axisOn[a.id]=k1.checked;run()});c1.appendChild(k1);tr.appendChild(c1);
+      var c2=document.createElement('td');var n=document.createElement('span');n.className='no'+(a.on?'':' off');n.style.background=col;n.style.color=a.on?'#fff':col;n.textContent=a.no;c2.appendChild(n);tr.appendChild(c2);
+      var c3=document.createElement('td');c3.className='m';c3.textContent=Math.round(a.len)+' m';tr.appendChild(c3);
+      var c4=document.createElement('td');c4.className='st';c4.textContent=a.cert?'✓ مطمئن':'مشکوک: '+a.reasons.join('، ');if(!a.cert)c4.style.color='var(--unc)';tr.appendChild(c4);
+      tr.addEventListener('click',function(){state.selId=a.id;draw();markSel()});
+      tr.addEventListener('mouseenter',function(){state.hoverId=a.id;draw()});
+      tr.addEventListener('mouseleave',function(){state.hoverId=null;draw()});
+      tb.appendChild(tr);
+    });
+  });
+  box.scrollTop=keep;
+}
+function markSel(scroll){
+  Array.prototype.forEach.call(document.querySelectorAll('#tb tr.row'),function(r){var on=r.dataset.id===state.selId;r.classList.toggle('sel',on);if(on&&scroll)r.scrollIntoView({block:'nearest'})});
+}
 function showResult(R){
+  numberAxes(R);
   setRes(true);
   var msgs=[];
   var u={};R.warn.forEach(function(w){u[w]=(u[w]||0)+1});Object.keys(u).forEach(function(w){msgs.push({t:w+(u[w]>1?' ('+u[w]+' مورد)':'')})});
@@ -1010,15 +1101,7 @@ function showResult(R){
   var st=$('stats');st.innerHTML='';
   [[R.axes.length,'آکس معبر'],[R.texts.length,'متن عرض'],[R.tris.length,'گوشهٔ پخ‌خورده'],[R.parcels.length,'پارسل'],[R.axesAll.filter(function(a){return !a.cert}).length,'معبر مشکوک'],[(R.curbs||[]).length,'خط جدول'],[R.blocks.length,'بلوک']].forEach(function(a){
     var d=document.createElement('div');d.className='stat';d.innerHTML='<b>'+a[0]+'</b><span>'+a[1]+'</span>';st.appendChild(d)});
-  var tb=$('tb');tb.innerHTML='';
-  var rows=R.axesAll.slice().sort(function(a,b){return (b.on-a.on)||(a.w-b.w)||(b.len-a.len)});
-  rows.forEach(function(a){
-    var tr=document.createElement('tr');
-    var c=document.createElement('td');var k=document.createElement('input');k.type='checkbox';k.checked=a.on;k.setAttribute('aria-label','عرض '+TAF.fmt(a.w));
-    k.addEventListener('change',function(){state.axisOn[a.id]=k.checked;run()});c.appendChild(k);tr.appendChild(c);
-    [TAF.fmt(a.w),Math.round(a.len)].forEach(function(v){var d=document.createElement('td');d.className='m';d.textContent=v;tr.appendChild(d)});
-    var s=document.createElement('td');s.textContent=a.cert?'مطمئن':('مشکوک: '+a.reasons.join('، '));if(!a.cert)s.style.color='var(--unc)';tr.appendChild(s);
-    tb.appendChild(tr)});
+  renderList(R);
 }
 
 /* load */
